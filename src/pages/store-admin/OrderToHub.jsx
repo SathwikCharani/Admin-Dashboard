@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
 import {
   Search,
   ShoppingCart,
@@ -13,7 +12,6 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useTheme } from '@/context/store-admin/ThemeContext';
-import { API } from '@/config/store-admin/api';
 import DatePicker from "@/components/common/DatePicker";
 
 // ─── Shared Date Picker used here ──────────────────────────────────────────────
@@ -74,35 +72,35 @@ const OrderToHub = () => {
 
   // ── Fetch products (same pattern as Products.jsx) ───────────────────────
   useEffect(() => {
-    const getProducts = async () => {
+    const getProducts = () => {
       setLoading(true);
       setFetchError(null);
 
       try {
-        const { data } = await axios.get(API.PRODUCTS);
+        const storedProductsStr = localStorage.getItem('products');
+        let list = [];
+        if (storedProductsStr) {
+          list = JSON.parse(storedProductsStr);
+          if (!Array.isArray(list)) list = [];
+        }
         
-        if (data === null || data === undefined) {
-          throw new Error('firebase_null');
-        }
+        const mappedList = list.map(item => ({
+          id: item.id || Date.now() + Math.random(),
+          name: item.name || item.productName || 'Unnamed Product',
+          price: item.price || item.sellingPrice || 0,
+          category: item.category || 'Uncategorized',
+          quantity: item.stock || item.itemsCount || item.quantity || 0,
+          image: item.image || item.imageUrl || '',
+          status: item.status || 'Active',
+          date: item.date || item.createdAt || new Date().toLocaleDateString(),
+          netWeight: item.netWeight || item.weight || "N/A"
+        }));
 
-        let list;
-        if (Array.isArray(data)) list = data;
-        else if (data.Products) list = data.Products;
-        else list = Object.entries(data).map(([id, val]) => ({ id, ...val }));
-
-        setProducts(list);
-        setLoading(false);
+        setProducts(mappedList);
       } catch (err) {
-        // Firebase failed OR returned null → fall back to local JSON
-        try {
-          const { data } = await axios.get('/data/products.json');
-          const list = Array.isArray(data) ? data : (data?.Products ?? []);
-          setProducts(list);
-          setLoading(false);
-        } catch (fallbackErr) {
-          setFetchError(fallbackErr.message);
-          setLoading(false);
-        }
+        setFetchError(err.message || 'Failed to load products from local storage');
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -142,7 +140,7 @@ const OrderToHub = () => {
     setCartItems(prev => {
       const existing = prev.find(item => item.id === product.id && item.weight === weight);
       if (existing) return prev; // already in summary, user can adjust qty there
-      return [...prev, { id: product.id, name: product.name, image: product.image, weight, quantity: 0, category: detectCategory(product.name) }];
+      return [...prev, { id: product.id, name: product.name, image: product.image, weight, quantity: 1, category: detectCategory(product.name), maxQuantity: product.quantity || 0, price: product.price || 0 }];
     });
   };
 
@@ -150,7 +148,7 @@ const OrderToHub = () => {
   const updateCartQuantity = (idx, val) => {
     const num = parseInt(val);
     setCartItems(prev => prev.map((item, i) =>
-      i === idx ? { ...item, quantity: isNaN(num) ? '' : Math.max(0, num) } : item
+      i === idx ? { ...item, quantity: isNaN(num) ? '' : Math.min(Math.max(0, num), item.maxQuantity) } : item
     ));
   };
 
@@ -162,8 +160,34 @@ const OrderToHub = () => {
   // ── Proceed to order (clears cart) ──────────────────────────────────────
   const handleProceedToOrder = () => {
     if (cartItems.length === 0) return;
+    
+    const cartTotal = cartItems.reduce((sum, item) => sum + ((item.price || 0) * (parseInt(item.quantity) || 0)), 0);
+
+    const newOrder = {
+      id: `#ORD-${Math.floor(1000 + Math.random() * 9000)}`,
+      storeName: 'My Store',
+      avatar: 'MS',
+      date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      items: cartItems.length,
+      total: `$${cartTotal.toFixed(2)}`,
+      status: 'Pending',
+      payment: 'N/A',
+      cartItems: cartItems
+    };
+    
+    try {
+      const existingStr = localStorage.getItem('hub_orders');
+      let existingOrders = existingStr ? JSON.parse(existingStr) : [];
+      if (!Array.isArray(existingOrders)) existingOrders = [];
+      existingOrders.unshift(newOrder);
+      localStorage.setItem('hub_orders', JSON.stringify(existingOrders));
+    } catch (e) {
+      console.error('Failed to save order locally', e);
+    }
+    
     setCartItems([]);
-    alert("Order details is send to hub dashboard");
+    alert("Order details successfully sent to hub dashboard!");
   };
 
   const totalItemsAdded = cartItems.length;
@@ -284,6 +308,8 @@ const OrderToHub = () => {
                   </th>
                   <th className="px-6 py-4 text-[11px] font-extrabold uppercase tracking-wider">Product</th>
                   <th className="px-6 py-4 text-[11px] font-extrabold uppercase tracking-wider">Net Wt</th>
+                  <th className="px-6 py-4 text-[11px] font-extrabold uppercase tracking-wider">Available</th>
+                  <th className="px-6 py-4 text-[11px] font-extrabold uppercase tracking-wider">Price</th>
                   <th className="px-6 py-4 text-[11px] font-extrabold uppercase tracking-wider text-right pr-8">Order</th>
                 </tr>
               </thead>
@@ -306,7 +332,7 @@ const OrderToHub = () => {
                           <img
                             src={p.image}
                             alt={p.name}
-                            className="w-full h-full object-contain mix-blend-multiply"
+                            className={`w-full h-full object-contain ${isDark ? '' : 'mix-blend-multiply'}`}
                             onError={(e) => { e.target.src = 'https://via.placeholder.com/100?text=Product'; }}
                           />
                         </div>
@@ -327,6 +353,12 @@ const OrderToHub = () => {
                           <option key={w} value={w}>{w}</option>
                         ))}
                       </select>
+                    </td>
+                    <td className={`px-6 py-4 text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                      {p.quantity || 0}
+                    </td>
+                    <td className={`px-6 py-4 text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                      ${(p.price || 0).toFixed(2)}
                     </td>
                     <td className="px-6 py-4 text-right pr-6">
                       <button
@@ -393,7 +425,7 @@ const OrderToHub = () => {
                             <img
                               src={item.image}
                               alt={item.name}
-                              className="w-full h-full object-contain mix-blend-multiply"
+                              className={`w-full h-full object-contain ${isDark ? '' : 'mix-blend-multiply'}`}
                               onError={(e) => { e.target.src = 'https://via.placeholder.com/100?text=P'; }}
                             />
                           </div>
@@ -414,15 +446,19 @@ const OrderToHub = () => {
                       {/* Quantity row */}
                       <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-dashed" style={{ borderColor: isDark ? '#334155' : '#e2e8f0' }}>
                         <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Qty</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.quantity}
-                          onChange={(e) => updateCartQuantity(idx, e.target.value)}
-                          className={`w-16 border rounded-lg py-1 text-center text-xs font-bold outline-none transition-all ${
-                            isDark ? 'bg-[#212529] border-slate-600 text-slate-200 focus:border-brand' : 'bg-white border-slate-200 text-slate-800 focus:border-brand'
-                          }`}
-                        />
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] whitespace-nowrap ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Max: {item.maxQuantity}</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max={item.maxQuantity}
+                            value={item.quantity}
+                            onChange={(e) => updateCartQuantity(idx, e.target.value)}
+                            className={`w-16 border rounded-lg py-1 text-center text-xs font-bold outline-none transition-all ${
+                              isDark ? 'bg-[#212529] border-slate-600 text-slate-200 focus:border-brand' : 'bg-white border-slate-200 text-slate-800 focus:border-brand'
+                            }`}
+                          />
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -430,8 +466,14 @@ const OrderToHub = () => {
               )}
             </div>
 
-            {/* Proceed Button */}
-            <div className={`px-6 py-4 border-t ${isDark ? 'border-slate-700/50' : 'border-slate-100'}`}>
+            {/* Cart Total & Proceed Button */}
+            <div className={`px-6 py-4 border-t flex flex-col gap-4 ${isDark ? 'border-slate-700/50' : 'border-slate-100'}`}>
+              <div className="flex items-center justify-between">
+                <span className={`text-sm font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Total</span>
+                <span className={`text-lg font-black ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                  ${cartItems.reduce((sum, item) => sum + ((item.price || 0) * (parseInt(item.quantity) || 0)), 0).toFixed(2)}
+                </span>
+              </div>
               <button
                 onClick={handleProceedToOrder}
                 disabled={cartItems.length === 0}

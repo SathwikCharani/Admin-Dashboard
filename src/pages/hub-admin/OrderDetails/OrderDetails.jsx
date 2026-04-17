@@ -15,7 +15,19 @@ const OrderDetails = () => {
   const formattedId = id?.startsWith('#') ? id : `#${id}`;
 
   const { data: ordersData, loading, error } = useFetch(API.ORDERS, '/data/orders.json');
-  const allOrders = Array.isArray(ordersData) ? ordersData : (ordersData?.orders ?? ordersData?.Orders ?? []);
+  const fetchedOrders = Array.isArray(ordersData) ? ordersData : (ordersData?.orders ?? ordersData?.Orders ?? []);
+  const [allOrders, setAllOrders] = useState([]);
+
+  useEffect(() => {
+    try {
+      const localStr = localStorage.getItem('hub_orders');
+      let localOrders = localStr ? JSON.parse(localStr) : [];
+      if (!Array.isArray(localOrders)) localOrders = [];
+      setAllOrders([...localOrders, ...fetchedOrders]);
+    } catch (e) {
+      setAllOrders(fetchedOrders);
+    }
+  }, [fetchedOrders]);
 
   const [order, setOrder] = useState(null);
   const [pastOrders, setPastOrders] = useState([]);
@@ -36,13 +48,24 @@ const OrderDetails = () => {
         const storePastOrders = allOrders.filter(o => o.storeName === foundOrder.storeName && o.id !== formattedId);
         setPastOrders(storePastOrders);
 
-        // Generate dummy current order items based on the number of items in the order
-        const itemsList = Array.from({ length: foundOrder.items }, (_, i) => ({
-          id: `item-${i + 1}`,
-          name: dummyProducts[Math.floor(Math.random() * dummyProducts.length)],
-          qty: Math.floor(Math.random() * 3) + 1,
-          netWt: netWtOptions[Math.floor(Math.random() * netWtOptions.length)],
-        }));
+        // Use cartItems if available, otherwise fallback to dummy items
+        let itemsList = [];
+        if (foundOrder.cartItems && foundOrder.cartItems.length > 0) {
+          itemsList = foundOrder.cartItems.map((item, i) => ({
+            id: item.id || `item-${i}`,
+            name: item.name,
+            qty: item.quantity,
+            netWt: item.weight,
+            price: item.price || 0
+          }));
+        } else {
+          itemsList = Array.from({ length: foundOrder.items }, (_, i) => ({
+            id: `item-${i + 1}`,
+            name: dummyProducts[Math.floor(Math.random() * dummyProducts.length)],
+            qty: Math.floor(Math.random() * 3) + 1,
+            netWt: netWtOptions[Math.floor(Math.random() * netWtOptions.length)],
+          }));
+        }
         setCurrentItems(itemsList);
       }
     }
@@ -57,30 +80,118 @@ const OrderDetails = () => {
   };
 
   const saveEdit = (id) => {
-    setCurrentItems(prev => prev.map(item => 
+    const updatedItems = currentItems.map(item => 
       item.id === id ? { ...item, name: editForm.name, qty: editForm.qty, netWt: editForm.netWt } : item
-    ));
+    );
+    setCurrentItems(updatedItems);
     setEditingItemId(null);
+
+    const newTotalStr = `$${updatedItems.reduce((sum, item) => sum + (item.price * item.qty), 0).toFixed(2)}`;
+
+    try {
+      const localStr = localStorage.getItem('hub_orders');
+      if (localStr) {
+        let localOrders = JSON.parse(localStr);
+        const orderIndex = localOrders.findIndex(o => o.id === formattedId);
+        if (orderIndex >= 0) {
+          localOrders[orderIndex].cartItems = updatedItems.map(ui => ({
+            id: ui.id,
+            name: ui.name,
+            quantity: ui.qty,
+            weight: ui.netWt,
+            price: ui.price
+          }));
+          localOrders[orderIndex].total = newTotalStr;
+          localOrders[orderIndex].items = updatedItems.length;
+          localStorage.setItem('hub_orders', JSON.stringify(localOrders));
+
+          // Also implicitly update current order state
+          setOrder(prev => ({ ...prev, total: newTotalStr, items: updatedItems.length, cartItems: localOrders[orderIndex].cartItems }));
+
+          // Notify Store Admin
+          const newNotif = {
+            id: Date.now(),
+            title: 'Order Updated',
+            description: `Order ${formattedId} details were modified by the Hub Admin.`,
+            time: 'Just now',
+            type: 'Order Updated'
+          };
+          const notifsStr = localStorage.getItem('store_notifications');
+          let notifs = notifsStr ? JSON.parse(notifsStr) : [];
+          notifs.unshift(newNotif);
+          localStorage.setItem('store_notifications', JSON.stringify(notifs));
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const updateOrderStatus = (newStatus) => {
+    try {
+      const localStr = localStorage.getItem('hub_orders');
+      if (localStr) {
+        let localOrders = JSON.parse(localStr);
+        const orderIndex = localOrders.findIndex(o => o.id === formattedId);
+        if (orderIndex >= 0) {
+          localOrders[orderIndex].status = newStatus;
+          localStorage.setItem('hub_orders', JSON.stringify(localOrders));
+
+          // Also update local state
+          setOrder({ ...order, status: newStatus });
+
+          // Notify Store Admin
+          const newNotif = {
+            id: Date.now(),
+            title: 'Order Status Updated',
+            description: `Order ${formattedId} status was changed to ${newStatus}.`,
+            time: 'Just now',
+            type: 'Order Updated'
+          };
+          const notifsStr = localStorage.getItem('store_notifications');
+          let notifs = notifsStr ? JSON.parse(notifsStr) : [];
+          notifs.unshift(newNotif);
+          localStorage.setItem('store_notifications', JSON.stringify(notifs));
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
     <div className="space-y-6 pb-8 animate-fade-in">
       {/* Header and Navigation */}
-      <div className="flex items-center gap-4">
-        <button 
-          onClick={() => navigate('/hub-dashboard/orders')}
-          className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <div>
-          <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Order Details</h2>
-          <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Information and items for {order.id}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => navigate('/hub-dashboard/orders')}
+            className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Order Details</h2>
+            <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Information and items for {order.id}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`text-sm font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Status:</span>
+          <select 
+            value={order.status || 'Pending'} 
+            onChange={(e) => updateOrderStatus(e.target.value)}
+            className={`px-4 py-2 rounded-lg text-sm font-bold border outline-none ${isDark ? 'bg-[#212529] border-slate-600 text-slate-200 focus:border-brand' : 'bg-white border-slate-200 text-slate-800 focus:border-brand shadow-sm'}`}
+          >
+            <option value="Pending">Pending</option>
+            <option value="Processing">Processing</option>
+            <option value="Delivered">Delivered</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
         </div>
       </div>
 
       {/* Store & Order Info Section */}
-      <div className={`grid grid-cols-1 md:grid-cols-4 gap-4 p-6 rounded-xl border shadow-sm ${isDark ? 'bg-[#2c3136] border-slate-700' : 'bg-white border-slate-200'}`}>
+      <div className={`grid grid-cols-1 md:grid-cols-5 gap-4 p-6 rounded-xl border shadow-sm ${isDark ? 'bg-[#2c3136] border-slate-700' : 'bg-white border-slate-200'}`}>
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-brand-light dark:bg-brand/20 flex items-center justify-center text-brand font-bold text-lg">
             {order.avatar}
@@ -116,6 +227,15 @@ const OrderDetails = () => {
           <div>
             <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Total Items</p>
             <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{order.items}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-violet-50 dark:bg-violet-500/10 flex items-center justify-center text-violet-600">
+            <span className="font-black text-xl">$</span>
+          </div>
+          <div>
+            <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Total Price</p>
+            <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{order.total || '$0.00'}</p>
           </div>
         </div>
       </div>

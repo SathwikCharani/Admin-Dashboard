@@ -3,7 +3,7 @@ import { NavLink, Link } from 'react-router-dom';
 import {
   Home, ShoppingBag, ShoppingCart, Users,
   CreditCard, User, Star, Award, BarChart2,
-  ChevronLeft, Menu, PlusCircle, Briefcase, Store, Truck
+  ChevronLeft, Menu, PlusCircle, Briefcase, Store, Truck, List
 } from 'lucide-react';
 import { useTheme } from "@/context/store-admin/ThemeContext";
 import logoImg from '@/assets/logo.png';
@@ -14,6 +14,7 @@ export const navItems = [
   { icon: <ShoppingBag size={20} />, label: 'Products', path: '/store-dashboard/products' },
   { icon: <Star size={20} />, label: 'Reviews', path: '/store-dashboard/reviews' },
   { icon: <PlusCircle size={20} />, label: 'Order to Hub', path: '/store-dashboard/order-to-hub' },
+  { icon: <List size={20} />, label: 'Orders From Hub', path: '/store-dashboard/orders-from-hub' },
   { icon: <ShoppingCart size={20} />, label: 'Orders', path: '/store-dashboard/orders' },
   { icon: <Truck size={20} />, label: 'Delivery Partners', path: '/store-dashboard/delivery-partners' },
   { icon: <CreditCard size={20} />, label: 'Transactions', path: '/store-dashboard/transactions' },

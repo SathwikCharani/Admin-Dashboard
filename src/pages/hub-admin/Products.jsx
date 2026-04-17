@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
 import {
   Search,
   Download,
@@ -9,9 +8,9 @@ import {
   ArrowDown,
   X,
   ShoppingBag,
+  Trash2,
 } from 'lucide-react';
 import { useTheme } from '@/context/hub-admin/ThemeContext';
-import { API } from "@/config/hub-admin/api";
 import DatePicker from "@/components/common/DatePicker";
 
 // ─── Store names no longer needed as data comes from JSON ────────────────────
@@ -137,40 +136,49 @@ const Products = () => {
   const [fetchError, setFetchError] = useState(null);
 
   useEffect(() => {
-    const getProducts = async () => {
+    const getProducts = () => {
       setLoading(true);
       setFetchError(null);
 
       try {
-        const { data } = await axios.get(API.PRODUCTS);
+        const storedProductsStr = localStorage.getItem('products');
+        let list = [];
+        if (storedProductsStr) {
+          list = JSON.parse(storedProductsStr);
+          if (!Array.isArray(list)) list = [];
+        }
         
-        if (data === null || data === undefined) {
-          throw new Error('firebase_null');
-        }
+        const mappedList = list.map(item => ({
+          id: item.id || Date.now() + Math.random(),
+          name: item.name || item.productName || 'Unnamed Product',
+          price: item.price || item.sellingPrice || 0,
+          category: item.category || 'Uncategorized',
+          quantity: item.stock || item.itemsCount || item.quantity || 0,
+          image: item.image || item.imageUrl || '',
+          status: item.status || 'Active',
+          date: item.date || item.createdAt || new Date().toLocaleDateString(),
+          netWeight: item.netWeight || item.weight || "N/A"
+        }));
 
-        let list;
-        if (Array.isArray(data)) list = data;
-        else if (data.Products) list = data.Products;
-        else list = Object.entries(data).map(([id, val]) => ({ id, ...val }));
-
-        setProducts(list);
-        setLoading(false);
+        setProducts(mappedList);
       } catch (err) {
-        // Firebase failed OR returned null → fall back to local JSON
-        try {
-          const { data } = await axios.get('/data/products.json');
-          const list = Array.isArray(data) ? data : (data?.Products ?? []);
-          setProducts(list);
-          setLoading(false);
-        } catch (fallbackErr) {
-          setFetchError(fallbackErr.message);
-          setLoading(false);
-        }
+        setFetchError(err.message || 'Failed to load products from local storage');
+      } finally {
+        setLoading(false);
       }
     };
 
     getProducts();
   }, []);
+
+  const handleRemoveProduct = (e, productId) => {
+    e.stopPropagation();
+    if (window.confirm("Are you sure you want to remove this product?")) {
+      const updatedProducts = products.filter(p => p.id !== productId);
+      setProducts(updatedProducts);
+      localStorage.setItem('products', JSON.stringify(updatedProducts));
+    }
+  };
 
   const [selectedCategory, setSelectedCategory] = useState('All category');
   const [selectedStatus, setSelectedStatus] = useState('Status');
@@ -328,8 +336,8 @@ const Products = () => {
                 <th className="px-6 py-4 text-[11px] font-extrabold uppercase tracking-wider">Quantity</th>
                 <th className="px-6 py-4 text-[11px] font-extrabold uppercase tracking-wider">Price</th>
                 <th className="px-6 py-4 text-[11px] font-extrabold uppercase tracking-wider text-center">Status</th>
-                <th className="px-6 py-4 text-[11px] font-extrabold uppercase tracking-wider">Date</th>
-                <th className="px-6 py-4 text-[11px] font-extrabold uppercase tracking-wider text-right pr-8">Details</th>
+                <th className="px-6 py-4 text-[11px] font-extrabold uppercase tracking-wider text-center">Date</th>
+                <th className="px-6 py-4 text-[11px] font-extrabold uppercase tracking-wider text-right pr-8">Actions</th>
               </tr>
             </thead>
             <tbody className={isDark ? 'divide-y divide-slate-700/50' : 'divide-y divide-slate-100'}>
@@ -352,7 +360,7 @@ const Products = () => {
                         <img
                           src={p.image}
                           alt={p.name}
-                          className="w-full h-full object-contain mix-blend-multiply"
+                          className={`w-full h-full object-contain ${isDark ? '' : 'mix-blend-multiply'}`}
                           onError={(e) => { e.target.src = 'https://via.placeholder.com/100?text=Product'; }}
                         />
                       </div>
@@ -379,16 +387,25 @@ const Products = () => {
                       {p.status}
                     </span>
                   </td>
-                  <td className={`px-6 py-4 text-[11px] font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <td className={`px-6 py-4 text-[11px] font-bold text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     {p.date}
                   </td>
                   <td className="px-6 py-4 text-right pr-6">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setSelectedProduct(p); }}
-                      className="bg-brand hover:bg-brand-hover text-white text-[11px] uppercase font-bold tracking-wider px-5 py-2 rounded-lg transition-all active:scale-95 shadow-sm"
-                    >
-                      Details
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSelectedProduct(p); }}
+                        className="bg-brand hover:bg-brand-hover text-white text-[11px] uppercase font-bold tracking-wider px-4 py-2 rounded-lg transition-all active:scale-95 shadow-sm"
+                      >
+                        Details
+                      </button>
+                      <button
+                        onClick={(e) => handleRemoveProduct(e, p.id)}
+                        className="bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white text-[11px] p-2 rounded-lg transition-all active:scale-95 shadow-sm"
+                        title="Remove Product"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

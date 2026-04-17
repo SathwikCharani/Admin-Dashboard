@@ -29,7 +29,20 @@ const Orders = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   const { data: ordersData, loading, error } = useFetch(API.ORDERS, '/data/orders.json');
-  const allOrders = Array.isArray(ordersData) ? ordersData : (ordersData?.orders ?? ordersData?.Orders ?? []);
+  const fetchedOrders = Array.isArray(ordersData) ? ordersData : (ordersData?.orders ?? ordersData?.Orders ?? []);
+
+  const [allOrders, setAllOrders] = React.useState([]);
+
+  React.useEffect(() => {
+    try {
+      const localStr = localStorage.getItem('hub_orders');
+      let localOrders = localStr ? JSON.parse(localStr) : [];
+      if (!Array.isArray(localOrders)) localOrders = [];
+      setAllOrders([...localOrders, ...fetchedOrders]);
+    } catch (e) {
+      setAllOrders(fetchedOrders);
+    }
+  }, [fetchedOrders]);
 
   const statuses = ['All', 'Delivered', 'Processing', 'Pending', 'Cancelled'];
 
@@ -106,7 +119,7 @@ const Orders = () => {
             <thead>
               <tr className={isDark ? 'bg-slate-800/30' : 'bg-slate-50/60'}>
                 <th className="px-6 py-4 text-[11px] font-extrabold uppercase tracking-wider text-center"><input type="checkbox" className="accent-blue-600" /></th>
-                {['Order ID', 'Store Name', 'Date', 'Items', 'Status', 'Action'].map(h => (
+                {['Order ID', 'Store Name', 'Date', 'Items', 'Total', 'Status', 'Action'].map(h => (
                   <th key={h} className={`px-6 py-4 text-[11px] font-extrabold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'} ${h === 'Action' ? 'text-right pr-8' : ''}`}>{h}</th>
                 ))}
               </tr>
@@ -134,6 +147,9 @@ const Orders = () => {
                       </div>
                     </td>
                     <td className={`px-6 py-4 text-xs font-bold ${isDark ? 'text-white' : 'text-slate-600'}`}>{order.items} item{order.items > 1 ? 's' : ''}</td>
+                    <td className={`px-6 py-4 text-xs font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                      {order.total || '$0.00'}
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold ${sc.color}`}>
                         {sc.icon} {order.status}

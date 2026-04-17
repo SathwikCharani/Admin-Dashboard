@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation, Outlet } from "react-router-dom";
 import HubLogin from "@/pages/public/HubLogin";
 import HubForm from "@/pages/public/HubForm";
 import StoreLogin from "@/pages/public/StoreLogin";
@@ -115,24 +115,35 @@ function App() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <Navbar />
-      <main className="p-8 min-h-screen">
-        <div className="max-w-7xl mx-auto">
-          <Routes>
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/hub-login" element={<HubLogin />} />
-            <Route path="/hub" element={<HubForm />} />
-            <Route path="/store-login" element={<StoreLogin />} />
-            <Route path="/store-dashboard" element={<StoreDashboard />} />
-            <Route path="/store" element={<StoreForm />} />
-            <Route path="/hub-signup" element={<HubSignup />} />
-            <Route path="/store-signup" element={<StoreSignup />} />
-            <Route path="/store-admin" element={<div className="text-center py-20"><h1 className="text-3xl font-bold">Store Admin Panel</h1><p className="text-gray-500 mt-4">Coming Soon</p></div>} />
-          </Routes>
+    <Routes>
+      <Route path="/hub-login" element={<HubLogin />} />
+      <Route path="/store-login" element={<StoreLogin />} />
+      <Route path="*" element={
+        <div className="bg-white h-screen w-full flex flex-col items-center justify-center">
+          <h1 className="text-4xl font-bold text-gray-800 mb-2">404 - Page Not Found</h1>
+          <p className="text-gray-500">The page you are looking for does not exist.</p>
         </div>
-      </main>
-    </div>
+      } />
+      
+      <Route element={
+        <div className="bg-gray-50 min-h-screen">
+          <Navbar />
+          <main className="p-8 min-h-screen">
+            <div className="max-w-7xl mx-auto">
+              <Outlet />
+            </div>
+          </main>
+        </div>
+      }>
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/hub" element={<HubForm />} />
+        <Route path="/store-dashboard" element={<StoreDashboard />} />
+        <Route path="/store" element={<StoreForm />} />
+        <Route path="/hub-signup" element={<HubSignup />} />
+        <Route path="/store-signup" element={<StoreSignup />} />
+        <Route path="/store-admin" element={<div className="text-center py-20"><h1 className="text-3xl font-bold">Store Admin Panel</h1><p className="text-gray-500 mt-4">Coming Soon</p></div>} />
+      </Route>
+    </Routes>
   );
 }
 

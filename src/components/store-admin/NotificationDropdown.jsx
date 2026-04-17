@@ -1,7 +1,7 @@
-import React from 'react';
+ import React, { useState, useEffect } from 'react';
 import { CreditCard, Package, AlertTriangle, X } from 'lucide-react';
 
-const notifications = [
+const staticNotifications = [
   {
     id: 1,
     title: 'Payment received',
@@ -29,6 +29,25 @@ const notifications = [
 ];
 
 const NotificationDropdown = ({ isDark, onClose }) => {
+  const [allNotifications, setAllNotifications] = useState(staticNotifications);
+
+  useEffect(() => {
+    try {
+      const localStr = localStorage.getItem('store_notifications');
+      if (localStr) {
+        const localNotifs = JSON.parse(localStr).map((notif, i) => ({
+          ...notif,
+          id: `local-${i}`,
+          icon: <Package size={18} className="text-brand" />,
+          bg: 'bg-brand-light dark:bg-brand/10'
+        }));
+        setAllNotifications([...localNotifs, ...staticNotifications]);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} aria-hidden="true" />
@@ -37,11 +56,11 @@ const NotificationDropdown = ({ isDark, onClose }) => {
       }`}>
         <div className={`flex items-center justify-between px-4 py-3 border-b ${isDark ? 'border-slate-700' : 'border-slate-100'}`}>
           <h3 className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-800'}`}>Notifications</h3>
-          <span className="text-[10px] font-bold bg-brand text-white px-2 py-0.5 rounded-full">3 New</span>
+          <span className="text-[10px] font-bold bg-brand text-white px-2 py-0.5 rounded-full">{allNotifications.length} New</span>
         </div>
         
         <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
-          {notifications.map((notif) => (
+          {allNotifications.map((notif) => (
             <div 
               key={notif.id} 
               className={`flex gap-3 p-4 border-b last:border-b-0 cursor-pointer transition-colors ${

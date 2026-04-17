@@ -131,8 +131,12 @@ const SidebarForm = ({ onAddProduct }) => {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file && file.type.startsWith('image/')) {
-      setImagePreview(URL.createObjectURL(file));
-      if (errors.imageFile) setErrors(prev => ({ ...prev, imageFile: null }));
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+        if (errors.imageFile) setErrors(prev => ({ ...prev, imageFile: null }));
+      };
+      reader.readAsDataURL(file);
     } else {
       alert('Please upload a valid image file.');
     }

@@ -6,6 +6,7 @@ import axios from 'axios';
  * add common headers, and implement interceptors for auth/logging.
  */
 const api = axios.create({
+  baseURL: 'http://localhost:4000',
   headers: {
     'Content-Type': 'application/json',
   },

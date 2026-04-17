@@ -7,13 +7,47 @@ const FinalSummary = () => {
   const navigate = useNavigate();
   const products = location.state?.products ?? [];
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleBack = () => navigate('/hub-dashboard/add-product');
 
-  const handleConsoleSubmit = (e) => {
+  const handleConsoleSubmit = async (e) => {
     if (e) e.preventDefault();
-    console.log('🚀 API Payload:', products);
-    setIsSubmitted(true);
+    setLoading(true);
+    try {
+      const existingProductsJSON = localStorage.getItem('products');
+      let savedProducts = [];
+      if (existingProductsJSON) {
+        try {
+          savedProducts = JSON.parse(existingProductsJSON);
+          if (!Array.isArray(savedProducts)) savedProducts = [];
+        } catch (e) {
+          savedProducts = [];
+        }
+      }
+
+      const newProducts = products.map((p) => ({
+        id: Date.now() + Math.random().toString(36).substring(2, 9),
+        name: p.productName,
+        price: Number(p.sellingPrice) || 0,
+        category: p.category,
+        stock: Number(p.itemsCount) || 1,
+        image: p.imageUrl || '',
+        weight: p.weight || "N/A",
+        date: new Date().toLocaleDateString(),
+        status: 'Active'
+      }));
+
+      savedProducts = [...savedProducts, ...newProducts];
+      localStorage.setItem('products', JSON.stringify(savedProducts));
+      
+      navigate('/hub-dashboard/products');
+    } catch (error) {
+      console.error('Error saving products:', error);
+      alert('Failed to save products locally. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (isSubmitted) {
@@ -63,9 +97,9 @@ const FinalSummary = () => {
             <h1>Final Submitted Products</h1>
             <span className="nav-count">{products.length} Products</span>
           </div>
-          <button className="btn-api-submit" onClick={handleConsoleSubmit} disabled={products.length === 0}>
+          <button className="btn-api-submit" onClick={handleConsoleSubmit} disabled={products.length === 0 || loading}>
             <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-            Confirm &amp; Submit
+            {loading ? 'Submitting...' : 'Confirm & Submit'}
           </button>
         </header>
 

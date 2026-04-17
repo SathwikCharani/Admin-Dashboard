@@ -132,6 +132,8 @@ const Products = () => {
   const { isDark } = useTheme();
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All category');
+  const [selectedStatus, setSelectedStatus] = useState('Active');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
@@ -143,24 +145,30 @@ const Products = () => {
 
       try {
         const { data } = await axios.get(API.PRODUCTS);
-        
-        if (data === null || data === undefined) {
-          throw new Error('firebase_null');
-        }
-
+        if (data === null || data === undefined) throw new Error('firebase_null');
         let list;
         if (Array.isArray(data)) list = data;
         else if (data.Products) list = data.Products;
         else list = Object.entries(data).map(([id, val]) => ({ id, ...val }));
+        
+        list = list.map(item => ({ ...item, status: item.status || 'Active' }));
 
-        setProducts(list);
+        // Merge with local storage
+        const storedProds = localStorage.getItem('store_products');
+        const localProds = storedProds ? JSON.parse(storedProds) : [];
+        setProducts([...localProds, ...list]);
         setLoading(false);
       } catch (err) {
-        // Firebase failed OR returned null → fall back to local JSON
         try {
           const { data } = await axios.get('/data/products.json');
-          const list = Array.isArray(data) ? data : (data?.Products ?? []);
-          setProducts(list);
+          let list = Array.isArray(data) ? data : (data?.Products ?? []);
+          list = list.map(item => ({ ...item, status: item.status || 'Active' }));
+          
+          // Merge with local storage
+          const storedProds = localStorage.getItem('store_products');
+          const localProds = storedProds ? JSON.parse(storedProds) : [];
+          setProducts([...localProds, ...list]);
+          
           setLoading(false);
         } catch (fallbackErr) {
           setFetchError(fallbackErr.message);
@@ -196,9 +204,12 @@ const Products = () => {
     document.body.removeChild(link);
   };
 
-   const filteredProducts = products.filter(p =>
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+   const filteredProducts = products.filter(p => {
+    const matchesSearch = p.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'All category' || p.category === selectedCategory;
+    const matchesStatus = selectedStatus === 'All' || p.status === selectedStatus;
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
 
   // ── Loading state ────────────────────────────────────────────────────────
   if (loading) {
@@ -274,18 +285,27 @@ const Products = () => {
           </div>
 
           <div className="md:col-span-8 flex flex-wrap md:flex-nowrap items-center gap-3 justify-end">
-            <select className={`border rounded-lg px-4 py-2 text-xs font-bold outline-none transition-all min-w-[140px] ${
+            <select 
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className={`border rounded-lg px-4 py-2 text-xs font-bold outline-none transition-all min-w-[140px] ${
               isDark ? 'bg-[#212529] border-slate-600 text-slate-300' : 'bg-white border-slate-200 text-slate-600'
             }`}>
               <option>All category</option>
+              {[...new Set(products.map(p => p.category).filter(Boolean))].map(cat => (
+                <option key={cat}>{cat}</option>
+              ))}
             </select>
             <DatePicker isDark={isDark} />
-            <select className={`border rounded-lg px-4 py-2 text-xs font-bold outline-none transition-all min-w-[120px] ${
+            <select 
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className={`border rounded-lg px-4 py-2 text-xs font-bold outline-none transition-all min-w-[120px] ${
               isDark ? 'bg-[#212529] border-slate-600 text-slate-300' : 'bg-white border-slate-200 text-slate-600'
             }`}>
-              <option>Status</option>
-              <option>Active</option>
-              <option>Hidden</option>
+              <option value="Active">Active</option>
+              <option value="Hidden">Hidden</option>
+              <option value="All">All Status</option>
             </select>
           </div>
         </div>

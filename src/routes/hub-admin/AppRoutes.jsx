@@ -85,9 +85,15 @@ const AppRoutes = () => {
         <Route path="create-admin" element={wrap(CreateAdmin)} />
         <Route path="logout"   element={wrap(Logout)} />
 
-        {/* Catch-all redirect */}
-        <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Route>
+      {/* Catch-all whitespace fallback outside Layout */}
+      {/* Catch-all whitespace fallback outside Layout */}
+      <Route path="*" element={
+        <div className="bg-[#1a1d21] h-screen w-full flex flex-col items-center justify-center">
+          <h1 className="text-4xl font-bold text-white mb-2">404 - Page Not Found</h1>
+          <p className="text-slate-400">The page you are looking for does not exist.</p>
+        </div>
+      } />
     </Routes>
   );
 };

@@ -20,6 +20,7 @@ const Wallet       = lazy(() => import('@/pages/store-admin/Wallet'));
 const Billing      = lazy(() => import('@/pages/store-admin/Billing'));
 const HelpCenter   = lazy(() => import('@/pages/store-admin/HelpCenter'));
 const OrderToHub     = lazy(() => import('@/pages/store-admin/OrderToHub'));
+const OrdersFromHub  = lazy(() => import('@/pages/store-admin/OrdersFromHub'));
 const Reviews        = lazy(() => import('@/pages/store-admin/Reviews'));
 const Statistics     = lazy(() => import('@/pages/store-admin/Statistics'));
 const DeliveryPartners = lazy(() => import('@/pages/store-admin/DeliveryPartners'));
@@ -59,6 +60,7 @@ const AppRoutes = () => {
         <Route path="products"     element={wrap(Products)} />
         <Route path="reviews"      element={wrap(Reviews)} />
         <Route path="order-to-hub"  element={wrap(OrderToHub)} />
+        <Route path="orders-from-hub" element={wrap(OrdersFromHub)} />
         <Route path="delivery-partners" element={wrap(DeliveryPartners)} />
         <Route path="statistics"    element={wrap(Statistics)} />
         <Route path="transactions" element={wrap(Transactions)} />
@@ -85,9 +87,15 @@ const AppRoutes = () => {
         <Route path="billing"  element={wrap(Billing)} />
         <Route path="help"     element={wrap(HelpCenter)} />
 
-        {/* Catch-all redirect */}
-        <Route path="*" element={<Navigate to="/store-dashboard/dashboard" replace />} />
       </Route>
+      {/* Catch-all whitespace fallback outside Layout */}
+      {/* Catch-all whitespace fallback outside Layout */}
+      <Route path="*" element={
+        <div className="bg-[#1a1d21] h-screen w-full flex flex-col items-center justify-center">
+          <h1 className="text-4xl font-bold text-white mb-2">404 - Page Not Found</h1>
+          <p className="text-slate-400">The page you are looking for does not exist.</p>
+        </div>
+      } />
     </Routes>
   );
 };
